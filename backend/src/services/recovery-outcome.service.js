@@ -1,4 +1,7 @@
 const db = require("../config/database");
+const {
+  MAX_RECOVERY_ATTEMPTS,
+} = require("./guardrail.service");
 
 async function recordRecoveryOutcome(
   recoveryCaseId,
@@ -8,6 +11,7 @@ async function recordRecoveryOutcome(
     `SELECT
        id,
        risk_amount,
+       recovery_attempts,
        status
      FROM recovery_cases
      WHERE id = ?`,
@@ -20,8 +24,18 @@ async function recordRecoveryOutcome(
 
   const recoveryCase = cases[0];
 
+  const attempts = Number(
+    recoveryCase.recovery_attempts || 0
+  );
+
+  // ==================================================
+  // SUCCESS
+  // ==================================================
+
   if (outcome === "SUCCESS") {
-    const amountRecovered = Number(recoveryCase.risk_amount);
+    const amountRecovered = Number(
+      recoveryCase.risk_amount
+    );
 
     await db.query(
       `UPDATE recovery_cases
@@ -50,6 +64,7 @@ async function recordRecoveryOutcome(
         "recovery-system",
         JSON.stringify({
           amountRecovered,
+          attempt: attempts,
         }),
       ]
     );
@@ -58,53 +73,89 @@ async function recordRecoveryOutcome(
       success: true,
       status: "RECOVERED",
       amountRecovered,
+      attempts,
     };
   }
 
-if (outcome === "FAILED") {
-  const [attemptRows] = await db.query(
-    `SELECT recovery_attempts
-     FROM recovery_cases
-     WHERE id = ?`,
-    [recoveryCaseId]
-  );
+  // ==================================================
+  // FAILED
+  // ==================================================
 
-  const attempts = Number(
-    attemptRows[0].recovery_attempts || 0
-  );
+  if (outcome === "FAILED") {
 
-  await db.query(
-    `UPDATE recovery_actions
-     SET result = 'RECOVERY_FAILED'
-     WHERE recovery_case_id = ?
-     ORDER BY id DESC
-     LIMIT 1`,
-    [recoveryCaseId]
-  );
+    // --------------------------------------------
+    // HARD STOP:
+    // Never increment beyond maximum attempts
+    // --------------------------------------------
 
-  await db.query(
-    `INSERT INTO audit_logs
-     (recovery_case_id, event_type, actor, details)
-     VALUES (?, ?, ?, ?)`,
-    [
-      recoveryCaseId,
-      "RECOVERY_FAILED",
-      "recovery-system",
-      JSON.stringify({
-        attempt: attempts,
-        message: "Recovery attempt failed",
-      }),
-    ]
-  );
+    if (attempts >= MAX_RECOVERY_ATTEMPTS) {
 
-  // Stop after maximum attempts
-  if (attempts >= 2) {
+      // Make sure status is terminal
+      await db.query(
+        `UPDATE recovery_cases
+         SET status = 'RETRY_LIMIT_REACHED'
+         WHERE id = ?`,
+        [recoveryCaseId]
+      );
+
+      // Do NOT create another RECOVERY_FAILED event
+      // and do NOT increment the counter.
+
+      await db.query(
+        `INSERT INTO audit_logs
+         (recovery_case_id, event_type, actor, details)
+         VALUES (?, ?, ?, ?)`,
+        [
+          recoveryCaseId,
+          "RECOVERY_STOPPED",
+          "guardrail-engine",
+          JSON.stringify({
+            reason: "Maximum recovery attempts reached",
+            attempts,
+            maxAttempts: MAX_RECOVERY_ATTEMPTS,
+          }),
+        ]
+      );
+
+      return {
+        success: false,
+        status: "RETRY_LIMIT_REACHED",
+        amountRecovered: 0,
+        attempts,
+        stopped: true,
+        retryAllowed: false,
+      };
+    }
+
+    // --------------------------------------------
+    // Count the new failed attempt
+    // --------------------------------------------
+
+    const newAttempts = attempts + 1;
+
     await db.query(
       `UPDATE recovery_cases
-       SET status = 'RETRY_LIMIT_REACHED'
+       SET recovery_attempts = ?
        WHERE id = ?`,
+      [newAttempts, recoveryCaseId]
+    );
+
+    // --------------------------------------------
+    // Mark latest recovery action as failed
+    // --------------------------------------------
+
+    await db.query(
+      `UPDATE recovery_actions
+       SET result = 'RECOVERY_FAILED'
+       WHERE recovery_case_id = ?
+       ORDER BY id DESC
+       LIMIT 1`,
       [recoveryCaseId]
     );
+
+    // --------------------------------------------
+    // Audit failure
+    // --------------------------------------------
 
     await db.query(
       `INSERT INTO audit_logs
@@ -112,44 +163,78 @@ if (outcome === "FAILED") {
        VALUES (?, ?, ?, ?)`,
       [
         recoveryCaseId,
-        "RECOVERY_STOPPED",
-        "guardrail-engine",
+        "RECOVERY_FAILED",
+        "recovery-system",
         JSON.stringify({
-          reason: "Maximum recovery attempts reached",
-          attempts,
+          attempt: newAttempts,
+          maxAttempts: MAX_RECOVERY_ATTEMPTS,
+          message: "Recovery attempt failed",
         }),
       ]
     );
 
+    // --------------------------------------------
+    // Maximum reached AFTER this attempt
+    // --------------------------------------------
+
+    if (newAttempts >= MAX_RECOVERY_ATTEMPTS) {
+
+      await db.query(
+        `UPDATE recovery_cases
+         SET status = 'RETRY_LIMIT_REACHED'
+         WHERE id = ?`,
+        [recoveryCaseId]
+      );
+
+      await db.query(
+        `INSERT INTO audit_logs
+         (recovery_case_id, event_type, actor, details)
+         VALUES (?, ?, ?, ?)`,
+        [
+          recoveryCaseId,
+          "RECOVERY_STOPPED",
+          "guardrail-engine",
+          JSON.stringify({
+            reason: "Maximum recovery attempts reached",
+            attempts: newAttempts,
+            maxAttempts: MAX_RECOVERY_ATTEMPTS,
+          }),
+        ]
+      );
+
+      return {
+        success: false,
+        status: "RETRY_LIMIT_REACHED",
+        amountRecovered: 0,
+        attempts: newAttempts,
+        stopped: true,
+        retryAllowed: false,
+      };
+    }
+
+    // --------------------------------------------
+    // Retry is still allowed
+    // --------------------------------------------
+
+    await db.query(
+      `UPDATE recovery_cases
+       SET status = 'RECOVERY_FAILED'
+       WHERE id = ?`,
+      [recoveryCaseId]
+    );
+
     return {
       success: false,
-      status: "RETRY_LIMIT_REACHED",
+      status: "RECOVERY_FAILED",
       amountRecovered: 0,
-      attempts,
-      stopped: true,
+      attempts: newAttempts,
+      stopped: false,
+      retryAllowed: true,
     };
   }
 
-  // Retry still allowed
-  await db.query(
-    `UPDATE recovery_cases
-     SET status = 'RECOVERY_FAILED'
-     WHERE id = ?`,
-    [recoveryCaseId]
-  );
-
-  return {
-    success: false,
-    status: "RECOVERY_FAILED",
-    amountRecovered: 0,
-    attempts,
-    stopped: false,
-    retryAllowed: true,
-  };
-}
-
   throw new Error(
-    "Outcome must be SUCCESS or FAILED"
+    "Invalid recovery outcome"
   );
 }
 

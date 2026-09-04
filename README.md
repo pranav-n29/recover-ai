@@ -157,11 +157,11 @@ Important system events are recorded for traceability, including:
  ---
 ## 🏗️ RecoverAI — Complete System Architecture
 
-                         ┌──────────────────────────────┐
+                           ┌──────────────────────────────┐
                          │          USER / ADMIN        │
                          │                              │
-                         │  Dashboard • Cases • Audit   │
-                         │  Decisions • Guardrails      │
+                         │  Dashboard • Cases • Audit  │
+                         │  Decisions • Guardrails     │
                          └──────────────┬───────────────┘
                                         │
                                         │ HTTP / REST API
@@ -170,9 +170,9 @@ Important system events are recorded for traceability, including:
 │                         FRONTEND LAYER                              │
 │                     React + Vite Application                        │
 │                                                                     │
-│  ┌─────────────┐ ┌────────────────┐ ┌──────────────┐ ┌───────────┐  │
-│  │  Overview   │ │ Recovery Cases │ │  Decisions   │ │Guardrails │  │
-│  └─────────────┘ └────────────────┘ └──────────────┘ └───────────┘  │
+│  ┌─────────────┐ ┌────────────────┐ ┌──────────────┐ ┌───────────┐ │
+│  │  Overview   │ │ Recovery Cases │ │  Decisions   │ │Guardrails │ │
+│  └─────────────┘ └────────────────┘ └──────────────┘ └───────────┘ │
 │                                                                     │
 │                         ┌──────────────┐                            │
 │                         │  Audit Trail │                            │
@@ -195,30 +195,30 @@ Important system events are recorded for traceability, including:
 │ │ Recovery     │       │ AI Agent       │       │ Dashboard     │ │
 │ │ Service      │       │ Service        │       │ Service       │ │
 │ └──────┬───────┘       └───────┬────────┘       └───────┬───────┘ │
-│        │                        │                       │         │
-│        │                        ▼                       │         │
+│        │                        │                        │         │
+│        │                        ▼                        │         │
 │        │               ┌─────────────────┐              │         │
 │        │               │  Google Gemini  │              │         │
 │        │               │   AI Decision   │              │         │
 │        │               └────────┬────────┘              │         │
-│        │                        │                       │         │
-│        │                        ▼                       │         │
+│        │                        │                        │         │
+│        │                        ▼                        │         │
 │        │               ┌─────────────────┐              │         │
 │        └──────────────►│   GUARDRAILS    │◄─────────────┘         │
-│                        │ Deterministic   │                        │
-│                        │ Policy Engine   │                        │
-│                        └────────┬────────┘                        │
-│                                 │                                 │
-│                       ┌─────────┴──────────┐                      │
-│                       │                    │                      │
-│                    APPROVED             BLOCKED                   │
-│                       │                    │                      │
-│                       ▼                    ▼                      │
-│                ┌───────────────┐    ┌───────────────┐             │
-│                │ Action Router │    │ Audit Logger  │             │
-│                └───────┬───────┘    └───────┬───────┘             │
-│                        │                    │                     │
-└────────────────────────┼────────────────────┼─────────────────────┘
+│                        │ Deterministic   │                         │
+│                        │ Policy Engine   │                         │
+│                        └────────┬────────┘                         │
+│                                 │                                  │
+│                       ┌─────────┴──────────┐                       │
+│                       │                    │                       │
+│                    APPROVED             BLOCKED                    │
+│                       │                    │                       │
+│                       ▼                    ▼                       │
+│                ┌───────────────┐    ┌───────────────┐              │
+│                │ Action Router │    │ Audit Logger  │              │
+│                └───────┬───────┘    └───────┬───────┘              │
+│                        │                    │                       │
+└────────────────────────┼────────────────────┼───────────────────────┘
                          │                    │
                          ▼                    ▼
               ┌──────────────────┐    ┌──────────────────┐
@@ -232,7 +232,6 @@ Important system events are recorded for traceability, including:
                   │ Recovery    │    │ Recovery     │    │ Audit Logs  │
                   │ Cases       │    │ Actions      │    │             │
                   └─────────────┘    └──────────────┘    └─────────────┘
-
 ---
 
 ## Technology Stack

@@ -153,6 +153,86 @@ Important system events are recorded for traceability, including:
 
 **Dashboard + Audit Trail**
 
+
+ ---
+## 🏗️ RecoverAI — Complete System Architecture
+
+                         ┌──────────────────────────────┐
+                         │          USER / ADMIN        │
+                         │                              │
+                         │  Dashboard • Cases • Audit   │
+                         │  Decisions • Guardrails      │
+                         └──────────────┬───────────────┘
+                                        │
+                                        │ HTTP / REST API
+                                        ▼
+┌─────────────────────────────────────────────────────────────────────┐
+│                         FRONTEND LAYER                              │
+│                     React + Vite Application                        │
+│                                                                     │
+│  ┌─────────────┐ ┌────────────────┐ ┌──────────────┐ ┌───────────┐  │
+│  │  Overview   │ │ Recovery Cases │ │  Decisions   │ │Guardrails │  │
+│  └─────────────┘ └────────────────┘ └──────────────┘ └───────────┘  │
+│                                                                     │
+│                         ┌──────────────┐                            │
+│                         │  Audit Trail │                            │
+│                         └──────────────┘                            │
+└──────────────────────────────┬──────────────────────────────────────┘
+                               │
+                               │ REST API
+                               ▼
+┌─────────────────────────────────────────────────────────────────────┐
+│                         BACKEND LAYER                               │
+│                       Node.js + Express                             │
+│                                                                     │
+│  ┌────────────────────── API ROUTES ──────────────────────────────┐ │
+│  │ Health │ Dashboard │ Recovery │ Guardrails │ Audit │ Payments  │ │
+│  └──────────────────────────────┬─────────────────────────────────┘ │
+│                                 │                                   │
+│       ┌─────────────────────────┼─────────────────────────┐         │
+│       ▼                         ▼                         ▼         │
+│ ┌──────────────┐       ┌────────────────┐       ┌───────────────┐ │
+│ │ Recovery     │       │ AI Agent       │       │ Dashboard     │ │
+│ │ Service      │       │ Service        │       │ Service       │ │
+│ └──────┬───────┘       └───────┬────────┘       └───────┬───────┘ │
+│        │                        │                       │         │
+│        │                        ▼                       │         │
+│        │               ┌─────────────────┐              │         │
+│        │               │  Google Gemini  │              │         │
+│        │               │   AI Decision   │              │         │
+│        │               └────────┬────────┘              │         │
+│        │                        │                       │         │
+│        │                        ▼                       │         │
+│        │               ┌─────────────────┐              │         │
+│        └──────────────►│   GUARDRAILS    │◄─────────────┘         │
+│                        │ Deterministic   │                        │
+│                        │ Policy Engine   │                        │
+│                        └────────┬────────┘                        │
+│                                 │                                 │
+│                       ┌─────────┴──────────┐                      │
+│                       │                    │                      │
+│                    APPROVED             BLOCKED                   │
+│                       │                    │                      │
+│                       ▼                    ▼                      │
+│                ┌───────────────┐    ┌───────────────┐             │
+│                │ Action Router │    │ Audit Logger  │             │
+│                └───────┬───────┘    └───────┬───────┘             │
+│                        │                    │                     │
+└────────────────────────┼────────────────────┼─────────────────────┘
+                         │                    │
+                         ▼                    ▼
+              ┌──────────────────┐    ┌──────────────────┐
+              │ Razorpay Test    │    │      MySQL       │
+              │ Mode / Recovery  │    │    Database      │
+              └──────────────────┘    └──────────────────┘
+                                             │
+                         ┌───────────────────┼───────────────────┐
+                         ▼                   ▼                   ▼
+                  ┌─────────────┐    ┌──────────────┐    ┌─────────────┐
+                  │ Recovery    │    │ Recovery     │    │ Audit Logs  │
+                  │ Cases       │    │ Actions      │    │             │
+                  └─────────────┘    └──────────────┘    └─────────────┘
+
 ---
 
 ## Technology Stack
@@ -180,6 +260,32 @@ Important system events are recorded for traceability, including:
 - Razorpay Test Mode
 
 ---
+
+## 🚀 Quick Start
+
+### Prerequisites
+- Node.js
+- MySQL
+- Google Gemini API key
+- Razorpay test credentials
+
+
+### Backend
+
+```bash
+cd backend
+npm install
+npm run dev
+```
+
+### Frontend
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
 
 ## API Capabilities
 

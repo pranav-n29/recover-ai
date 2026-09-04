@@ -157,81 +157,259 @@ Important system events are recorded for traceability, including:
  ---
 ## 🏗️ RecoverAI — Complete System Architecture
 
-                           ┌──────────────────────────────┐
-                         │          USER / ADMIN        │
-                         │                              │
-                         │  Dashboard • Cases • Audit  │
-                         │  Decisions • Guardrails     │
-                         └──────────────┬───────────────┘
-                                        │
-                                        │ HTTP / REST API
-                                        ▼
-┌─────────────────────────────────────────────────────────────────────┐
-│                         FRONTEND LAYER                              │
-│                     React + Vite Application                        │
-│                                                                     │
-│  ┌─────────────┐ ┌────────────────┐ ┌──────────────┐ ┌───────────┐ │
-│  │  Overview   │ │ Recovery Cases │ │  Decisions   │ │Guardrails │ │
-│  └─────────────┘ └────────────────┘ └──────────────┘ └───────────┘ │
-│                                                                     │
-│                         ┌──────────────┐                            │
-│                         │  Audit Trail │                            │
-│                         └──────────────┘                            │
-└──────────────────────────────┬──────────────────────────────────────┘
-                               │
-                               │ REST API
-                               ▼
-┌─────────────────────────────────────────────────────────────────────┐
-│                         BACKEND LAYER                               │
-│                       Node.js + Express                             │
-│                                                                     │
-│  ┌────────────────────── API ROUTES ──────────────────────────────┐ │
-│  │ Health │ Dashboard │ Recovery │ Guardrails │ Audit │ Payments  │ │
-│  └──────────────────────────────┬─────────────────────────────────┘ │
-│                                 │                                   │
-│       ┌─────────────────────────┼─────────────────────────┐         │
-│       ▼                         ▼                         ▼         │
-│ ┌──────────────┐       ┌────────────────┐       ┌───────────────┐ │
-│ │ Recovery     │       │ AI Agent       │       │ Dashboard     │ │
-│ │ Service      │       │ Service        │       │ Service       │ │
-│ └──────┬───────┘       └───────┬────────┘       └───────┬───────┘ │
-│        │                        │                        │         │
-│        │                        ▼                        │         │
-│        │               ┌─────────────────┐              │         │
-│        │               │  Google Gemini  │              │         │
-│        │               │   AI Decision   │              │         │
-│        │               └────────┬────────┘              │         │
-│        │                        │                        │         │
-│        │                        ▼                        │         │
-│        │               ┌─────────────────┐              │         │
-│        └──────────────►│   GUARDRAILS    │◄─────────────┘         │
-│                        │ Deterministic   │                         │
-│                        │ Policy Engine   │                         │
-│                        └────────┬────────┘                         │
-│                                 │                                  │
-│                       ┌─────────┴──────────┐                       │
-│                       │                    │                       │
-│                    APPROVED             BLOCKED                    │
-│                       │                    │                       │
-│                       ▼                    ▼                       │
-│                ┌───────────────┐    ┌───────────────┐              │
-│                │ Action Router │    │ Audit Logger  │              │
-│                └───────┬───────┘    └───────┬───────┘              │
-│                        │                    │                       │
-└────────────────────────┼────────────────────┼───────────────────────┘
-                         │                    │
-                         ▼                    ▼
-              ┌──────────────────┐    ┌──────────────────┐
-              │ Razorpay Test    │    │      MySQL       │
-              │ Mode / Recovery  │    │    Database      │
-              └──────────────────┘    └──────────────────┘
-                                             │
-                         ┌───────────────────┼───────────────────┐
-                         ▼                   ▼                   ▼
-                  ┌─────────────┐    ┌──────────────┐    ┌─────────────┐
-                  │ Recovery    │    │ Recovery     │    │ Audit Logs  │
-                  │ Cases       │    │ Actions      │    │             │
-                  └─────────────┘    └──────────────┘    └─────────────┘
+## 🏗️ Complete System Architecture
+
+```mermaid
+flowchart TD
+
+    U[User / Admin]
+
+    subgraph FRONTEND["Frontend Layer — React + Vite"]
+        F[React Application]
+
+        O[Overview]
+        C[Recovery Cases]
+        D[Decisions]
+        G[Guardrails]
+        A[Audit Trail]
+
+        F --> O
+        F --> C
+        F --> D
+        F --> G
+        F --> A
+    end
+
+    subgraph BACKEND["Backend Layer — Node.js + Express"]
+        API[REST API]
+
+        RS[Recovery Service]
+        AIS[AI Agent Service]
+        DS[Dashboard Service]
+
+        GE["Deterministic Guardrail Engine"]
+        AR[Action Router]
+        AL[Audit Logger]
+
+        API --> RS
+        API --> AIS
+        API --> DS
+
+        RS --> GE
+        AIS --> GE
+
+        GE -->|Approved| AR
+        GE -->|Blocked| AL
+
+        AR --> AL
+    end
+
+    GEM["Google Gemini AI"]
+    DB[("MySQL Database")]
+    RP["Razorpay Test Mode"]
+
+    U --> F
+    F --> API
+
+    AIS --> GEM
+    GEM --> AIS
+
+    DS --> DB
+    RS --> DB
+    GE --> DB
+
+    AR --> RP
+    AR --> DB
+    AL --> DB
+```
+
+---
+
+## 🔄 AI-Powered Recovery Workflow
+
+```mermaid
+flowchart TD
+
+    P["Failed Payment"]
+    R["Risk & Recovery Analysis"]
+    C["Recovery Case Created"]
+    AI["Gemini AI Agent"]
+    REC["AI Recommendation"]
+
+    G["Deterministic Guardrail Engine"]
+
+    A["Approved"]
+    B["Blocked"]
+
+    ACT["Recovery Action"]
+    OUT["Recovery Outcome"]
+
+    AUD["Audit Trail"]
+    DB[("MySQL")]
+
+    P --> R
+    R --> C
+    C --> AI
+    AI --> REC
+    REC --> G
+
+    G -->|Pass| A
+    G -->|Fail| B
+
+    A --> ACT
+    ACT --> OUT
+
+    B --> AUD
+    OUT --> AUD
+
+    AUD --> DB
+    C --> DB
+```
+
+---
+
+## 🛡️ Guardrail Decision Architecture
+
+```mermaid
+flowchart TD
+
+    AI["AI Recommendation"]
+
+    A{"Allowed Action?"}
+    B{"Amount ≤ ₹10,000?"}
+    C{"Recovery Attempts < 2?"}
+    D{"AI Confidence ≥ 60%?"}
+    E{"Risk Policy Satisfied?"}
+
+    APPROVED["✅ APPROVED"]
+    BLOCKED["🛑 BLOCKED"]
+
+    ACTION["Action Router"]
+    AUDIT["Audit Logger"]
+
+    AI --> A
+
+    A -->|No| BLOCKED
+    A -->|Yes| B
+
+    B -->|No| BLOCKED
+    B -->|Yes| C
+
+    C -->|No| BLOCKED
+    C -->|Yes| D
+
+    D -->|No| BLOCKED
+    D -->|Yes| E
+
+    E -->|No| BLOCKED
+    E -->|Yes| APPROVED
+
+    APPROVED --> ACTION
+    BLOCKED --> AUDIT
+```
+
+---
+
+## 🗄️ Data Architecture
+
+```mermaid
+erDiagram
+
+    PAYMENTS ||--o| RECOVERY_CASES : creates
+    RECOVERY_CASES ||--o{ RECOVERY_ACTIONS : contains
+    RECOVERY_CASES ||--o{ AUDIT_LOGS : records
+
+    PAYMENTS {
+        int id
+        decimal amount
+        string status
+        string failure_reason
+    }
+
+    RECOVERY_CASES {
+        int id
+        int payment_id
+        decimal risk_amount
+        string risk_level
+        string risk_reason
+        string agent_decision
+        decimal agent_confidence
+        int recovery_attempts
+        string status
+    }
+
+    RECOVERY_ACTIONS {
+        int id
+        int recovery_case_id
+        string action_type
+        string result
+        decimal amount_recovered
+    }
+
+    AUDIT_LOGS {
+        int id
+        int recovery_case_id
+        string event_type
+        string actor
+        string details
+    }
+```
+
+---
+
+## 🧠 Core Architecture Principle
+
+> **AI recommends → Guardrails validate → System executes → Audit records**
+
+RecoverAI separates AI decision-making from financial execution. Gemini provides an intelligent recovery recommendation, but the deterministic Guardrail Engine decides whether that recommendation is permitted under the configured financial policies.
+
+This ensures that AI cannot directly execute unrestricted financial recovery actions.
+
+---
+
+## 🔐 Guardrail Controls
+
+The Guardrail Engine validates:
+
+- Allowed recovery actions
+- Maximum recovery amount
+- Maximum recovery attempts
+- Minimum AI confidence
+- Low-risk recovery restrictions
+- Recovery policy compliance
+
+If any rule is violated, the recommended action is **blocked** and recorded in the audit trail.
+
+---
+
+## 🔁 Recovery Lifecycle
+
+```text
+Failed Payment
+      ↓
+Risk Analysis
+      ↓
+Recovery Case
+      ↓
+Gemini AI Recommendation
+      ↓
+Guardrail Validation
+      ↓
+ ┌───────────────┐
+ │               │
+ ▼               ▼
+APPROVED       BLOCKED
+ │               │
+ ▼               ▼
+Recovery       No Unsafe
+Action         Action
+ │               │
+ └───────┬───────┘
+         ▼
+    Audit Trail
+         ↓
+      MySQL
+```
 ---
 
 ## Technology Stack

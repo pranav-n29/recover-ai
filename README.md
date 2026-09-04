@@ -155,7 +155,6 @@ Important system events are recorded for traceability, including:
 
 
  ---
-## 🏗️ RecoverAI — Complete System Architecture
 
 ## 🏗️ Complete System Architecture
 
@@ -453,7 +452,9 @@ Action         Action
 cd backend
 npm install
 npm run dev
+
 ```
+Backend: `http://localhost:5000`
 
 ### Frontend
 
@@ -461,7 +462,29 @@ npm run dev
 cd frontend
 npm install
 npm run dev
+
 ```
+
+Frontend: `http://localhost:5173`
+
+### Environment Variables
+
+Create a `.env` file inside the `backend` directory and configure:
+
+```env
+DB_HOST=localhost
+DB_PORT=3306
+DB_USER=your_mysql_user
+DB_PASSWORD=your_mysql_password
+DB_NAME=recoverai
+
+GEMINI_API_KEY=your_gemini_api_key
+
+RAZORPAY_KEY_ID=your_razorpay_key
+RAZORPAY_KEY_SECRET=your_razorpay_secret
+```
+
+Use your own credentials and do not commit `.env` to GitHub.
 
 
 ## API Capabilities

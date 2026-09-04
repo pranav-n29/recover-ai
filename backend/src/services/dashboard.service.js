@@ -73,28 +73,34 @@ async function getDashboardSummary() {
   const [confidenceRows] = await db.query(`
     SELECT
       COUNT(*) AS finalDecisions,
+
       COALESCE(
         AVG(agent_confidence),
         0
       ) AS avgConfidence
+
     FROM recovery_cases
+
     WHERE agent_decision IS NOT NULL
       AND agent_decision <> 'PENDING_AI_REVIEW'
       AND agent_confidence IS NOT NULL
   `);
 
   // =========================================================
-  // 5. GUARDRAIL BLOCKED ACTIONS
+  // 5. UNIQUE GUARDRail-BLOCKED CASES
   //
-  // This comes from audit_logs because a case can remain
-  // PENDING even when its action was blocked.
+  // Count each case only once even if the agent was executed
+  // multiple times for the same recovery case.
   // =========================================================
 
   const [blockedRows] = await db.query(`
     SELECT
-      COUNT(*) AS blockedActions
+      COUNT(DISTINCT recovery_case_id) AS blockedActions
+
     FROM audit_logs
+
     WHERE event_type = 'GUARDRAIL_BLOCKED'
+      AND recovery_case_id IS NOT NULL
   `);
 
   // =========================================================
@@ -154,7 +160,7 @@ async function getDashboardSummary() {
   // =========================================================
   // 8. POLICY COMPLIANCE
   //
-  // Percentage of cases whose actions were NOT blocked.
+  // Each blocked recovery case is counted only once.
   // =========================================================
 
   const policyCompliance =
@@ -229,17 +235,57 @@ async function getRecentCases(limit = 20) {
       rc.agent_decision,
       rc.agent_confidence,
       rc.recovery_attempts,
-      rc.created_at
+      rc.created_at,
+
+      /* -------------------------------------------------------
+         Get the LATEST guardrail evaluation for this case.
+         
+         This is important:
+         A previous BLOCKED event should not permanently make
+         the case appear BLOCKED.
+      ------------------------------------------------------- */
+
+      (
+        SELECT al.event_type
+
+        FROM audit_logs al
+
+        WHERE al.recovery_case_id = rc.id
+
+          AND al.event_type IN (
+            'GUARDRAIL_APPROVED',
+            'GUARDRAIL_BLOCKED'
+          )
+
+        ORDER BY al.id DESC
+
+        LIMIT 1
+      ) AS latest_guardrail_event,
+
+      /* -------------------------------------------------------
+         Get details from the latest guardrail evaluation.
+      ------------------------------------------------------- */
+
+      (
+        SELECT al.details
+
+        FROM audit_logs al
+
+        WHERE al.recovery_case_id = rc.id
+
+          AND al.event_type IN (
+            'GUARDRAIL_APPROVED',
+            'GUARDRAIL_BLOCKED'
+          )
+
+        ORDER BY al.id DESC
+
+        LIMIT 1
+      ) AS latest_guardrail_details
 
     FROM recovery_cases rc
 
     ORDER BY
-      CASE
-        WHEN rc.agent_decision IS NOT NULL
-         AND rc.agent_decision <> 'PENDING_AI_REVIEW'
-        THEN 0
-        ELSE 1
-      END,
       rc.id DESC
 
     LIMIT ?
@@ -247,44 +293,120 @@ async function getRecentCases(limit = 20) {
     [safeLimit]
   );
 
-  return rows.map((row) => ({
-    id: row.id,
+  // ===========================================================
+  // FORMAT RESULTS
+  // ===========================================================
 
-    paymentId: row.payment_id,
+  return rows.map((row) => {
+    let guardrailReason = null;
 
-    amount: Number(
-      row.risk_amount
-    ),
+    // ---------------------------------------------------------
+    // Parse latest guardrail details
+    // ---------------------------------------------------------
 
-    riskReason:
-      row.risk_reason || null,
+    if (row.latest_guardrail_details) {
+      try {
+        const details =
+          typeof row.latest_guardrail_details === "string"
+            ? JSON.parse(row.latest_guardrail_details)
+            : row.latest_guardrail_details;
 
-    // Used by Overview → Latest AI Decision
-    agentReason:
-      row.risk_reason || null,
+        guardrailReason =
+          details?.reasons?.[0] ||
+          details?.reason ||
+          details?.message ||
+          null;
+      } catch {
+        guardrailReason = null;
+      }
+    }
 
-    riskLevel:
-      row.risk_level,
+    // ---------------------------------------------------------
+    // Determine latest guardrail result
+    // ---------------------------------------------------------
 
-    status:
-      row.status,
+    const latestGuardrailEvent =
+      String(
+        row.latest_guardrail_event || ""
+      ).toUpperCase();
 
-    agentDecision:
-      row.agent_decision,
+    const isBlocked =
+      latestGuardrailEvent ===
+      "GUARDRAIL_BLOCKED";
 
-    agentConfidence:
-      row.agent_confidence !== null
-        ? Number(row.agent_confidence)
-        : null,
+    const isApproved =
+      latestGuardrailEvent ===
+      "GUARDRAIL_APPROVED";
 
-    recoveryAttempts:
-      Number(row.recovery_attempts || 0),
+    // ---------------------------------------------------------
+    // Return frontend-ready case
+    // ---------------------------------------------------------
 
-    createdAt:
-      row.created_at,
-  }));
+    return {
+      id: row.id,
+
+      paymentId: row.payment_id,
+
+      amount: Number(
+        row.risk_amount
+      ),
+
+      riskReason:
+        row.risk_reason || null,
+
+      // Used by Overview / case details
+      agentReason:
+        row.risk_reason || null,
+
+      riskLevel:
+        row.risk_level,
+
+      status:
+        row.status,
+
+      agentDecision:
+        row.agent_decision,
+
+      agentConfidence:
+        row.agent_confidence !== null
+          ? Number(row.agent_confidence)
+          : null,
+
+      recoveryAttempts:
+        Number(
+          row.recovery_attempts || 0
+        ),
+
+      createdAt:
+        row.created_at,
+
+      // =====================================================
+      // LATEST GUARDRail RESULT
+      // =====================================================
+
+      guardrailApproved:
+        isBlocked
+          ? false
+          : isApproved
+          ? true
+          : null,
+
+      guardrailStatus:
+        isBlocked
+          ? "BLOCKED"
+          : isApproved
+          ? "APPROVED"
+          : "NOT_EVALUATED",
+
+      guardrailReason,
+    };
+  });   
 }
 
+
+// =============================================================
+// EXPORTS
+// =============================================================
 
 module.exports = {
   getDashboardSummary,

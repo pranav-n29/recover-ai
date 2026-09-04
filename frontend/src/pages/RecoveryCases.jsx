@@ -354,10 +354,10 @@ export default function RecoveryCases({
 
       <div className="metric-grid five">
 
-        <MetricCard
-          label="TOTAL"
-          value={counts.total}
-        />
+      <MetricCard
+  label="SHOWING"
+  value={counts.total}
+/>
 
         <MetricCard
           label="RECOVERED"
@@ -581,11 +581,13 @@ export default function RecoveryCases({
                       {/* STATUS */}
 
                       <td>
-                        <StatusBadge
-                          value={
-                            c.status
-                          }
-                        />
+                       <StatusBadge
+  value={
+    blocked
+      ? "BLOCKED"
+      : c.status
+  }
+/>
                       </td>
 
                     </tr>
